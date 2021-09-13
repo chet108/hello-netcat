@@ -1,9 +1,30 @@
-@@ -0,0 +1,8 @@
-# Hello Netcat
+on: push
 
-[![Run on Google Cloud](https://storage.googleapis.com/cloudrun/button.png)](https://deploy.cloud.run)
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
 
-Run Locally:
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
 
-- `docker build -t hello-netcat .`
-- `docker run -p 8080:8080 -e PORT=8080 -it hello-netcat`
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v0.2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT }}
+          service_account_key: ${{ secrets.GCP_CREDENTIALS }}
+          export_default_credentials: true
+
+      - name: Create & Publish Container
+        run: |
+          gcloud auth configure-docker
+          docker build -t gcr.io/${{ secrets.GCP_PROJECT }}/${{ github.event.repository.name }}:${{ github.sha }} .
+          docker push gcr.io/${{ secrets.GCP_PROJECT }}/${{ github.event.repository.name }}:${{ github.sha }}
+      - name: Deploy
+        uses: jamesward/easycloudrun/deploy@main
+        env:
+          PROJECT_ID: ${{ secrets.GCP_PROJECT }}
+          COMMIT_SHA: ${{ github.sha }}
+          IMAGE_NAME: ${{ github.event.repository.name }}
+          IMAGE_VERSION: ${{ github.sha }}
+          REGION: ${{ secrets.GCP_REGION }}
